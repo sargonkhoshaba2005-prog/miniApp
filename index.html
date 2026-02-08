@@ -1,0 +1,337 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lab Case Intake</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 14px; }
+    h2 { margin: 0 0 10px; }
+    label { display:block; margin:10px 0 6px; font-weight:600; }
+
+    input, select, textarea {
+      width:100%;
+      padding:10px;
+      font-size:14px;
+      box-sizing:border-box;
+    }
+
+    /* make Shade clickable in Telegram */
+    #shade { position: relative; z-index: 50; pointer-events: auto; }
+
+    textarea { min-height: 70px; }
+
+    .row { display:flex; gap:10px; }
+    .row > div { flex:1; }
+
+    .teethWrap { margin-top: 10px; }
+
+    /* 8 teeth + divider + 8 teeth */
+    .teethRow {
+      display:grid;
+      grid-template-columns: repeat(8, 1fr) 0.35fr repeat(8, 1fr);
+      gap:6px;
+      margin:8px 0;
+      align-items: center;
+    }
+
+    .tooth {
+      padding:10px 0;
+      border:1px solid #bbb;
+      border-radius:10px;
+      text-align:center;
+      cursor:pointer;
+      user-select:none;
+      font-size:13px;
+      background:#fff;
+    }
+
+    .tooth.sel { font-weight:700; }
+
+    /* deeper colors (only when selected) */
+    .tooth.sel.single  { background:#cfe0ff; border-color:#2f66ff; } /* blue */
+    .tooth.sel.bridge  { background:#c9f5d7; border-color:#1aa354; } /* green */
+    .tooth.sel.implant { background:#ffd0d0; border-color:#e03030; } /* red */
+
+    .divider {
+      text-align:center;
+      font-weight:900;
+      font-size:16px;
+      cursor:default;
+      user-select:none;
+    }
+
+    .small { font-size:12px; opacity:.85; margin-top:6px; }
+
+    .legend {
+      display:flex;
+      gap:14px;
+      align-items:center;
+      margin-top:6px;
+      font-size:12px;
+      opacity:.9;
+    }
+    .dot {
+      width:10px; height:10px; border-radius:50%;
+      display:inline-block; margin-right:6px;
+    }
+    .dot.blue  { background:#2f66ff; }
+    .dot.green { background:#1aa354; }
+    .dot.red   { background:#e03030; }
+
+    .bar { display:flex; gap:10px; margin-top: 14px; }
+    button {
+      flex:1;
+      padding:12px;
+      font-size:15px;
+      border-radius:12px;
+      border:0;
+      cursor:pointer;
+      background:#eee;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>New Case</h2>
+<div class="small" id="tgStatus"></div>
+  <label>Doctor</label>
+  <input id="doctor" placeholder="Dr name" />
+
+  <label>Patient</label>
+  <input id="patient" placeholder="Patient name / code" />
+
+  <div class="row">
+    <div>
+      <label>Date</label>
+      <input id="date" type="date" />
+    </div>
+    <div>
+      <label>Due date</label>
+      <input id="due" type="date" />
+    </div>
+  </div>
+
+  <!-- Type + Material aligned -->
+  <div class="row">
+    <div>
+      <label>Type</label>
+      <select id="type">
+        <option value="">Select…</option>
+
+        <!-- most used (top) -->
+        <option value="Crown (Single)">Crown (Single)</option>
+        <option value="Bridge">Bridge</option>
+        <option value="Implant">Implant</option>
+
+        <option disabled>────────────</option>
+
+        <!-- other types -->
+        <option value="Veneer">Veneer</option>
+        <option value="Inlay/Onlay">Inlay/Onlay</option>
+        <option value="Denture">Denture</option>
+        <option value="Other">Other</option>
+      </select>
+
+      <!-- color indicators (legend) -->
+      <div class="legend">
+        <span><span class="dot blue"></span>Single</span>
+        <span><span class="dot green"></span>Bridge</span>
+        <span><span class="dot red"></span>Implant</span>
+      </div>
+
+      <div class="small">Tip: choose Type, then tap tooth (it colors only that tooth).</div>
+    </div>
+
+    <div>
+      <label>Material</label>
+      <select id="material">
+        <option value="">Select…</option>
+        <option>Zirconia</option>
+        <option>EMAX</option>
+        <option>PMMA</option>
+        <option>Metal</option>
+        <option>Acrylic</option>
+        <option>Other</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Shade + Scanner aligned -->
+  <div class="row">
+    <div>
+      <label>Shade</label>
+      <input id="shade" type="text" inputmode="text" autocomplete="off" placeholder="A1 / A2 / BL1 …" />
+    </div>
+    <div>
+      <label>Scanner</label>
+      <select id="scanner">
+        <option value="">Select…</option>
+        <option>TRIOS</option>
+        <option>iTero</option>
+        <option>Medit</option>
+        <option>3Shape</option>
+        <option>Other</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="teethWrap">
+    <label>Teeth (tap to select) — showing 8..1 | 1..8 (FDI stored)</label>
+    <div class="teethRow" id="upper"></div>
+    <div class="teethRow" id="lower"></div>
+    <div class="small" id="selectedText">Selected (FDI): (none)</div>
+  </div>
+
+  <label>Notes</label>
+  <textarea id="notes" placeholder="Margin, occlusion, special instructions…"></textarea>
+
+  <div class="bar">
+    <button id="clearBtn" type="button">Clear teeth</button>
+    <button id="submitBtn" type="button">Submit</button>
+  </div>
+
+<script>
+  const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+  if (tg) { tg.ready(); tg.expand(); }
+document.getElementById('tgStatus').textContent = tg ? "Telegram: OK" : "Telegram: NOT detected";
+  // default date
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('date').value = today;
+
+  // mode per tooth (FDI -> "single"/"bridge"/"implant")
+  const toothMode = new Map();
+
+  function currentMode(){
+    const t = (document.getElementById('type').value || "").toLowerCase();
+    if (t.includes("bridge")) return "bridge";
+    if (t.includes("implant")) return "implant";
+    // crown(single) + all others default to single color
+    return "single";
+  }
+
+  function buildRowData(which){
+    // display: 8 7 6 5 4 3 2 1 | 1 2 3 4 5 6 7 8
+    if(which === "upper"){
+      return [
+        {fdi:"18",label:"8"},{fdi:"17",label:"7"},{fdi:"16",label:"6"},{fdi:"15",label:"5"},
+        {fdi:"14",label:"4"},{fdi:"13",label:"3"},{fdi:"12",label:"2"},{fdi:"11",label:"1"},
+        {divider:true},
+        {fdi:"21",label:"1"},{fdi:"22",label:"2"},{fdi:"23",label:"3"},{fdi:"24",label:"4"},
+        {fdi:"25",label:"5"},{fdi:"26",label:"6"},{fdi:"27",label:"7"},{fdi:"28",label:"8"}
+      ];
+    }
+    // lower
+    return [
+      {fdi:"48",label:"8"},{fdi:"47",label:"7"},{fdi:"46",label:"6"},{fdi:"45",label:"5"},
+      {fdi:"44",label:"4"},{fdi:"43",label:"3"},{fdi:"42",label:"2"},{fdi:"41",label:"1"},
+      {divider:true},
+      {fdi:"31",label:"1"},{fdi:"32",label:"2"},{fdi:"33",label:"3"},{fdi:"34",label:"4"},
+      {fdi:"35",label:"5"},{fdi:"36",label:"6"},{fdi:"37",label:"7"},{fdi:"38",label:"8"}
+    ];
+  }
+
+  function renderRow(el, data){
+    el.innerHTML = "";
+    data.forEach(item=>{
+      if(item.divider){
+        const d = document.createElement("div");
+        d.className = "divider";
+        d.textContent = "|";
+        el.appendChild(d);
+        return;
+      }
+
+      const btn = document.createElement("div");
+      btn.className = "tooth";
+      btn.textContent = item.label;
+      btn.dataset.fdi = item.fdi;
+      btn.dataset.label = item.label;
+
+      btn.onclick = ()=>{
+        const fdi = btn.dataset.fdi;
+
+        // toggle select
+        if(toothMode.has(fdi)){
+          toothMode.delete(fdi);
+          btn.classList.remove("sel","single","bridge","implant");
+        } else {
+          const mode = currentMode();
+          toothMode.set(fdi, mode);
+          btn.classList.add("sel");
+          btn.classList.remove("single","bridge","implant");
+          btn.classList.add(mode);
+        }
+        updateSelectedText();
+      };
+
+      el.appendChild(btn);
+    });
+  }
+
+  function updateSelectedText(){
+    const list = Array.from(toothMode.keys()).sort((a,b)=>Number(a)-Number(b));
+    document.getElementById("selectedText").textContent =
+      "Selected (FDI): " + (list.length ? list.join(", ") : "(none)");
+  }
+
+  function val(id){ return (document.getElementById(id).value || "").trim(); }
+
+  // render
+  renderRow(document.getElementById("upper"), buildRowData("upper"));
+  renderRow(document.getElementById("lower"), buildRowData("lower"));
+
+  // clear
+  document.getElementById("clearBtn").onclick = ()=>{
+    toothMode.clear();
+    document.querySelectorAll(".tooth").forEach(b=>{
+      b.classList.remove("sel","single","bridge","implant");
+    });
+    updateSelectedText();
+  };
+
+  // submit
+  document.getElementById("submitBtn").onclick = ()=>{
+document.getElementById('tgStatus').textContent = "Submit clicked…";
+    const teeth = Array.from(toothMode.entries())
+      .map(([fdi, mode])=>{
+        // find display label
+        const el = document.querySelector(`.tooth[data-fdi="${fdi}"]`);
+        const label = el ? el.dataset.label : "";
+        return { fdi, label, mode };
+      })
+      .sort((a,b)=>Number(a.fdi)-Number(b.fdi));
+
+    const payload = {
+      doctor: val("doctor"),
+      patient: val("patient"),
+      date: val("date"),
+      due: val("due"),
+      type: val("type"),
+      material: val("material"),
+      shade: val("shade"),
+      scanner: val("scanner"),
+      teeth,                 // includes per-tooth mode + display label + FDI
+      notes: val("notes")
+    };
+
+    if(!payload.doctor || !payload.type || !payload.material || teeth.length===0){
+      alert("Required: Doctor + Type + Material + at least 1 tooth.");
+      return;
+    }
+
+    const data = JSON.stringify(payload);
+if (tg) {
+  document.getElementById('tgStatus').textContent = "Sending...";
+ tg.sendData(data);
+document.getElementById('tgStatus').textContent = "Sent ✅";
+setTimeout(() => tg.close(), 500);
+} else {
+  alert("Telegram not detected. Data:\n" + data);
+}
+
+  };
+</script>
+</body>
+</html>
