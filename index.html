@@ -119,18 +119,16 @@
       <label>Type</label>
       <select id="type">
         <option value="">Select…</option>
-
-        <!-- most used (top) -->
         <option value="Crown (Single)">Crown (Single)</option>
         <option value="Bridge">Bridge</option>
-        <option value="Implant">Implant</option>
-
-        <option disabled>────────────</option>
-
-        <!-- other types -->
+        <option value="Implant Crown">Implant Crown</option>
+        <option value="Implant Bridge">Implant Bridge</option>
         <option value="Veneer">Veneer</option>
-        <option value="Inlay/Onlay">Inlay/Onlay</option>
-        <option value="Denture">Denture</option>
+        <option value="Inlay">Inlay</option>
+        <option value="Onlay">Onlay</option>
+        <option value="Overlay">Overlay</option>
+        <option value="Night Guard">Night Guard</option>
+        <option value="Scanner Service">Scanner Service</option>
         <option value="Other">Other</option>
       </select>
 
@@ -154,6 +152,7 @@
         <option>Zircon + Emax Powder</option>
         <option>Emax</option>
         <option>Metal</option>
+        <option>PMMA</option>
         <option>Titanium Bar</option>
         <option>Night Guard Material</option>
         <option>Scanner Service / None</option>
@@ -209,9 +208,9 @@
 
   function currentMode(){
     const t = (document.getElementById('type').value || "").toLowerCase();
-    if (t.includes("bridge")) return "bridge";
     if (t.includes("implant")) return "implant";
-    // crown(single) + all others default to single color
+    if (t.includes("bridge")) return "bridge";
+    // crown, veneer, inlay, onlay, overlay default to single color
     return "single";
   }
 
@@ -282,6 +281,19 @@
 
   function val(id){ return (document.getElementById(id).value || "").trim(); }
 
+  // Auto material for simple work types; user can still change manually
+  document.getElementById("type").addEventListener("change", ()=>{
+    const type = val("type");
+    const material = document.getElementById("material");
+    if (["Inlay", "Onlay", "Overlay", "Veneer"].includes(type)) {
+      material.value = "Emax";
+    } else if (type === "Night Guard") {
+      material.value = "Night Guard Material";
+    } else if (type === "Scanner Service") {
+      material.value = "Scanner Service / None";
+    }
+  });
+
   // render
   renderRow(document.getElementById("upper"), buildRowData("upper"));
   renderRow(document.getElementById("lower"), buildRowData("lower"));
@@ -319,8 +331,9 @@
       notes: val("notes")
     };
 
-    if(!payload.doctor || !payload.type || !payload.material || teeth.length===0){
-      alert("Required: Doctor + Type + Material + at least 1 tooth.");
+    const shadeRequired = !(payload.type === "Night Guard" || payload.type === "Scanner Service");
+    if(!payload.doctor || !payload.type || !payload.material || teeth.length===0 || (shadeRequired && !payload.shade)){
+      alert("Required: Doctor + Type + Material + Shade + at least 1 tooth.");
       return;
     }
 
