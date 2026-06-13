@@ -95,7 +95,7 @@
 
 <body>
   <h2>New Case</h2>
-<div class="small" id="tgStatus"></div>
+
   <label>Doctor</label>
   <input id="doctor" placeholder="Dr name" />
 
@@ -148,11 +148,15 @@
       <label>Material</label>
       <select id="material">
         <option value="">Select…</option>
-        <option>Zirconia</option>
-        <option>EMAX</option>
-        <option>PMMA</option>
+        <option>Zircon</option>
+        <option>Zircon Full Anatomy</option>
+        <option>Zircon VIP</option>
+        <option>Zircon + Emax Powder</option>
+        <option>Emax</option>
         <option>Metal</option>
-        <option>Acrylic</option>
+        <option>Titanium Bar</option>
+        <option>Night Guard Material</option>
+        <option>Scanner Service / None</option>
         <option>Other</option>
       </select>
     </div>
@@ -195,7 +199,7 @@
 <script>
   const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
   if (tg) { tg.ready(); tg.expand(); }
-document.getElementById('tgStatus').textContent = tg ? "Telegram: OK" : "Telegram: NOT detected";
+
   // default date
   const today = new Date().toISOString().slice(0,10);
   document.getElementById('date').value = today;
@@ -293,7 +297,6 @@ document.getElementById('tgStatus').textContent = tg ? "Telegram: OK" : "Telegra
 
   // submit
   document.getElementById("submitBtn").onclick = ()=>{
-document.getElementById('tgStatus').textContent = "Submit clicked…";
     const teeth = Array.from(toothMode.entries())
       .map(([fdi, mode])=>{
         // find display label
@@ -322,15 +325,13 @@ document.getElementById('tgStatus').textContent = "Submit clicked…";
     }
 
     const data = JSON.stringify(payload);
-if (tg) {
-  document.getElementById('tgStatus').textContent = "Sending...";
- tg.sendData(data);
-document.getElementById('tgStatus').textContent = "Sent ✅";
-setTimeout(() => tg.close(), 500);
-} else {
-  alert("Telegram not detected. Data:\n" + data);
-}
 
+    if (tg) {
+      tg.sendData(data);
+      tg.close();
+    } else {
+      alert("Telegram not detected. Data:\n" + data);
+    }
   };
 </script>
 </body>
